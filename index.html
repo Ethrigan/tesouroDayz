@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZenTreasure Photos - Form</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 16px; }
+    .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    .left { flex: 1 1 420px; min-width: 320px; }
+    .right { flex: 1 1 520px; min-width: 320px; }
+    label { display: block; font-weight: 600; margin-top: 10px; }
+    input[type="text"], textarea, select { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 6px; }
+    textarea { min-height: 120px; resize: vertical; }
+    .hint { color: #555; font-size: 12px; line-height: 1.35; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; vertical-align: top; }
+    th { text-align: left; background: #fafafa; position: sticky; top: 0; }
+    tr:hover { background: #fcfcfc; cursor: pointer; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #ddd; color: #333; }
+    .bad { border-color: #f2c2c2; color: #8a1f1f; background: #fff5f5; }
+    .good { border-color: #cfe7cf; color: #1d5b1d; background: #f6fff6; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .topbar { display: grid; gap: 10px; margin-bottom: 12px; }
+    .small { font-size: 12px; color: #666; }
+
+    /* NOVO: rolagem vertical na lista de itens parseados */
+    .tableWrap {
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* imagens responsivas */
+    img {
+      width: 100%;
+      max-width: 360px;
+      height: auto;
+      object-fit: cover;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #f7f7f7;
+    }
+
+    /* NOVO: descrição acima + duas imagens lado a lado */
+    .descMedia {
+      display: grid;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .mediaGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .mediaGrid textarea { min-height: 240px; }
+
+    @media (max-width: 820px) {
+      .mediaGrid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar panel">
+    <div class="row" style="gap:10px; align-items:center;">
+      <div style="flex: 1 1 520px;">
+        <div class="small">Filtro</div>
+        <input id="filter" type="text" placeholder="ex.: 30, Sakhal, 'sinal', 8310" />
+        <div class="hint">
+          Observação: este HTML é “hard-coded” (o conteúdo do config.cpp está embutido aqui). Se você editar o config.cpp,
+          precisa regenerar este HTML ou colar o novo conteúdo no bloco <span class="mono">configcpp</span>.
+        </div>
+      </div>
+      <div style="min-width: 260px;">
+        <span id="status" class="pill good">Pronto</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="left panel">
+      <div class="small">Itens parseados</div>
+
+      <!-- NOVO: wrapper rolável -->
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:72px;">ID</th>
+              <th style="width:140px;">Referência</th>
+              <th style="width:130px;">X/Z</th>
+              <th style="width:120px;">Mapa</th>
+              <th>Imagem</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="right panel">
+      <div class="small">Formulário</div>
+
+      <label>Referência no config.cpp</label>
+      <input id="ref" type="text" class="mono" readonly />
+
+      <label>mapName</label>
+      <input id="mapName" type="text" class="mono" readonly />
+
+      <label>Coordenada (x/z)</label>
+      <input id="xz" type="text" class="mono" placeholder="ex.: 8310.6406/7540.4961" />
+
+      <!-- NOVO LAYOUT: descrição em cima, duas imagens lado a lado -->
+      <div class="descMedia">
+        <div>
+          <label>Descrição</label>
+          <textarea id="desc" placeholder="descriptionShort"></textarea>
+        </div>
+
+        <div class="mediaGrid">
+          <div>
+            <img id="preview" alt="preview" />
+            <label>Imagem (arquivo em images/)</label>
+            <select id="imgSelect"></select>
+            <div class="hint">Preview usa caminho relativo: <span class="mono">images/&lt;arquivo&gt;</span>.</div>
+          </div>
+
+          <div>
+            <img id="mapPreview" alt="mapa preview" />
+            <label>Mapa (arquivo em mapas/)</label>
+            <input id="mapFile" type="text" class="mono" readonly />
+            <div class="hint">Preview usa caminho relativo: <span class="mono">mapas/&lt;arquivo&gt;</span>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- config.cpp EMBUTIDO (hard-coded) -->
+  <script id="configcpp" type="text/plain">
+class CfgPatches
+{
+	class ZenTreasurePhotos
+	{
+		requiredVersion=0.1;
+		requiredAddons[]=
+		{
+			"DZ_Data",
+			"DZ_Scripts",
+			"ZenTreasureBase"
+		};
+	};
+};
+class CfgVehicles
+{
+	class ZenTreasure_PhotoBase;
+	class ZenTreasure_Livônia
+	{
+		wrongMapText="This photo looks like it was taken in Livonia... I should travel there before I look for this treasure.";
+	};
+	class ZenTreasure_Chernarus
+	{
+		wrongMapText="This photo looks like it was taken in Chernarus... I should travel there before I look for this treasure.";
+	};
+	class ZenTreasure_Sakhal
+	{
+		wrongMapText="This photo looks like it was taken in Sakhal... I should travel there before I look for this treasure.";
+	};
+	class ZenTreasure_Photo26: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Bom, o treinamento básico acabou bem a tempo do fim do mundo. Parece que houve um surto de zumbis. Soa ridículo para mim, vou acreditar quando vir. Antes de irmos embora fizemos uma grande bebedeira no bar local. Um grupo de nós enterrou alguns equipamentos TREASURETYPE perto de umas rochas no morro, como uma cápsula do tempo caso esse papo de zumbis fosse real. Vamos voltar para pegar em alguns anos, a não ser que alguém encontre antes!";
+		treasure_stash_x=4884.4336;
+		treasure_stash_z=2732.6389;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo27: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Ele implorou. Disse que tinha família. Eu disse que eu também tinha – no fim era mentira. Essa foto? Tirei logo depois de acabar com ele. Enterrei o estoque TREASURETYPE dele nas árvores perto de onde esta foto foi tirada, ao sul de Green Mountain, sob um monte de terra que ainda estava quente do calor do corpo dele quando fui embora. Se você quiser, cave rápido. Talvez não esteja sozinho. Estou começando a gostar desse estilo de vida. Queria que o apocalipse tivesse chegado antes.";
+		treasure_stash_x=3539.5161;
+		treasure_stash_z=5428.5371;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo28: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Se você está lendo isso, então eu não consegui. Enterrei meu último estoque de coisas TREASURETYPE acima das falésias de Belaya Polana, perto de uma árvore amarela solitária. Queria ter tido mais tempo. Queria que todos nós tivéssemos. Pegue meu equipamento. Continue vivo a qualquer custo. É o máximo que dá para esperar hoje em dia.";
+		treasure_stash_x=14174.47;
+		treasure_stash_z=15256.252;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo29: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Isto é para o Corvo Negro. Operação fracassada. Equipe KIA. Só um sobrevivente: eu. Há um estoque TREASURETYPE escondido perto de onde você tirou esta foto de mim ano passado, sob uma árvore amarela. Marcado com um galho quebrado. Recupere se for possível. Eu não volto, não quero comprometer a localização do nosso abrigo. Agora você está sozinho. Boa sorte. Fim de transmissão.";
+		treasure_stash_x=4238.457;
+		treasure_stash_z=11164.961;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo30: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Disseram que o sinal era só estática. Mas eu ouvi. Uma voz, clara como o dia, chamando lá de cima, a leste das cidades gêmeas e de suas igrejas inúteis. Deixei meus suprimentos TREASURETYPE lá, enterrados debaixo do aço que vibra. Se o sinal falar com você também... você vai saber onde cavar.";
+		treasure_stash_x=8310.6406;
+		treasure_stash_z=7540.4961;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo31: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Regra nº 1 do apocalipse: nunca confie em um cara chamado Greg. Ele roubou meus sapatos e me deixou largado com esta foto. Mas a piada é com ele – eu já tinha enterrado todo o loot TREASURETYPE que encontramos juntos. Fica perto da ponte onde o conheci, perto de onde ele tirou essa foto dos meus malditos sapatos. Vai demorar para eu conseguir voltar lá. Boa sorte, Greg. Espero que seus pés doam.";
+		treasure_stash_x=563.24402;
+		treasure_stash_z=10993.575;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo32: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Para minha filha: se algum dia você voltar para casa e encontrar isto, eu já me fui. Fui mordido e estou partindo antes que as coisas piorem. Não quero que você me veja assim. Saiba que nunca deixei de te amar, nem de acreditar que você voltaria. Deixei um estoque TREASURETYPE enterrado perto da nossa casa, debaixo da velha árvore que a gente subia quando você era criança. Se cuide. Eu te amo.";
+		treasure_stash_x=12525.001;
+		treasure_stash_z=10425.946;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo33: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Quando o reino caiu em caos, resisti dentro do castelo naquela ilha ao longe. Por três luas reinei como Sir Thaddeus, Guardião de Chernarus, Matador de Mortos-Vivos. Mas... espadas de espuma não servem contra zumbis de verdade. Enterrei meu mais precioso tesouro TREASURETYPE na escadaria do castelo e fugi. Talvez você seja mais corajoso do que eu. Ou só mais idiota.";
+		treasure_stash_x=13414.611;
+		treasure_stash_z=3284.5928;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo34: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="A luz não funciona há semanas. Ninguém vem. Continuei esperando alguém responder aos pedidos de socorro... mas só o silêncio respondeu. Já aceitei. Antes de acabar com tudo, enterrei meus suprimentos TREASURETYPE atrás do galpão do meu farol. Se você encontrar – viva melhor do que eu vivi.";
+		treasure_stash_x=2632.3083;
+		treasure_stash_z=2211.7861;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo35: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Matamos todos. Homens, mulheres, crianças. Idosos, jovens, doentes, saudáveis... todos mortos. Meu comandante disse que não podíamos arriscar. A cidade inteira tinha sido exposta à contaminação. Isso nos torna melhores do que as criaturas que viemos matar? Já não sei. Recolhemos todos os pertences deles, algumas tralhas, mas em grande parte itens TREASURETYPE, e enterramos ao lado dos corpos. Eles não vão usar mesmo; se você encontrar esta nota, talvez tenha motivos para desenterrar.";
+		treasure_stash_x=14851.45;
+		treasure_stash_z=14607.78;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo36: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Corremos por dias. Sem comida. Sem sono. Só gritos atrás de nós. Joguei tudo o que pude para ficar leve. O resto dos meus suprimentos TREASURETYPE está enterrado exatamente onde tirei esta foto final da cidade onde cresci e para onde nunca mais posso voltar. Achei que um dia voltaria para buscar, mas não há mais chance. Se você encontrar, pegue e corra. Não olhe para trás.";
+		treasure_stash_x=11853.894;
+		treasure_stash_z=14726.686;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo37: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Vimos três homens entrarem nesse castelo velho. Só um voltou. Não falou nada. Não piscou. Só deixou cair esta foto e entrou na floresta. Dizem que tem equipamentos TREASURETYPE escondidos lá, parece estar enterrado atrás de uma lixeira em um ponto turístico antigo. Depois de ver os olhos dele... eu não chego nem perto desse lugar. Cabe a você decidir se vale a pena.";
+		treasure_stash_x=1541.4906;
+		treasure_stash_z=9130.5801;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo38: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Ela dizia que esse era o lugar favorito dela. Tão quieto. Tão em paz. Às vezes venho aqui só para lembrar. Deixei alguns TREASURETYPE atrás da grande árvore perto da cruz dela – me pareceu errado levar comigo. Se alguém encontrar isso, o estoque é seu, se quiser.";
+		treasure_stash_x=2554.4971;
+		treasure_stash_z=5931.147;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo39: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Trabalhei na estação de rádio a vida toda. Mas essa pandemia saiu de controle. Estamos evacuando todo o prédio. Se, por acaso, algum dia conseguirmos voltar, enterrei vários equipamentos TREASURETYPE entre três árvores amarelas, perto de onde tirei esta última foto. Se eu não voltar para pegar, talvez quem encontrar esta nota volte.";
+		treasure_stash_x=8238.0986;
+		treasure_stash_z=9099.5674;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo40: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Vim para as falésias para ficar sozinho. Muito antes dos mortos se levantarem, eu já tinha desistido de gente. Mas agora todo mundo vem rastejando – vivos e outros tipos. Estou indo embora. Enterrei meu equipamento TREASURETYPE debaixo de uma árvore solitária, bem no norte das montanhas, onde o vento uiva e nenhum passo ecoa. Se você encontrou isso, talvez o mundo também tenha te arrastado até aqui. Pegue o que precisar. Eu não preciso mais.";
+		treasure_stash_x=6051.1553;
+		treasure_stash_z=14745.204;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo41: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Esta foi a última foto que tirei da minha irmã. Estávamos indo para a próxima cidade – só duas mochilas e um pouco de esperança. Bandidos nos emboscaram antes mesmo de passarmos por Pusta. Matei todos eles. Cada um. Enterrei o equipamento TREASURETYPE dela perto de uma árvore grande, próximo de onde esta foto foi tirada. Não consegui carregar o peso. Se alguém encontrar isso, pode ficar com o que achar. Só tome cuidado. Ninguém merece o destino da minha irmã.";
+		treasure_stash_x=8829.9414;
+		treasure_stash_z=2863.1929;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo42: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Sei que você não se orgulha de mim, pai, mas fiz o que precisava fazer. Quando o surto começou, o comando mandou segurar a posição. Mas eu vi o que vinha pela frente – e não ia morrer por políticos que fugiram primeiro. Desertei naquela noite e enterrei o equipamento TREASURETYPE que não pude levar comigo, atrás da última fileira de alvos no antigo estande de tiro, caso algum dia precisemos dele. Não me arrependo de ter ido embora. Só me arrependo de não ter ido antes. Pense de mim como quiser – pelo menos estou vivo. Todos que ficaram lá estão mortos.";
+		treasure_stash_x=1008.7724;
+		treasure_stash_z=14604.788;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo43: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="A terra parou de dar frutos muito antes dos mortos chegarem. Tentei resistir – à fazenda, à rotina, à esperança. Mas no fim, tudo secou. Enterrei meus suprimentos TREASURETYPE debaixo de uma árvore morta à beira do lago, não muito longe de Novaya Petrovka, perto do antigo reservatório de água. Se você está lendo isto, pegue. Só não desperdice.";
+		treasure_stash_x=4664.8584;
+		treasure_stash_z=13339.625;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo44: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Nunca precisei de muito. Só uma linha, um anzol e o lago cercado por penhascos. Os peixes mordiam sempre. O silêncio, mais ainda. Ultimamente as pessoas começaram a aparecer por aqui com mais frequência. Acho que é hora de ir embora. Enterrei o equipamento TREASURETYPE que não pude levar na península do lago, onde eu costumava sentar e ver a neblina subir. Se você for do tipo quieto, talvez sinta o que eu sentia aqui. Se não for – pegue o equipamento e siga em frente. Já não me importo.";
+		treasure_stash_x=13326.987;
+		treasure_stash_z=12054.108;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo45: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Encontramos um homem morto perto de umas ruínas de castelo no norte. Acho que não foram os infectados que o mataram. Parecia que algo grande tinha pegado ele, talvez um urso? O rosto estava coberto de arranhões sangrentos, irreconhecível. Vasculhamos a área, mas não achamos nenhum sinal de outros sobreviventes. Enterramos as coisas dele, um monte de equipamentos TREASURETYPE, ao pé da árvore morta que aparece ao fundo desta foto. Se você encontrar isto e conhecer esse homem, o equipamento dele está lá. Tomara que você tenha mais sorte do que ele.";
+		treasure_stash_x=6876.0562;
+		treasure_stash_z=11424.153;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo46: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Fiquei nas ruínas daquela prisão por semanas. Achei que fosse o abrigo perfeito. Mas os sons... sussurros nas celas, passos quando eu estava sozinho. Não aguentei mais. Fugi à noite só com uma tocha. O equipamento TREASURETYPE que eu tinha era pesado demais para nadar muito longe, então enterrei na ilha mais distante perto da prisão e tirei esta foto para lembrar onde deixei. Não pretendo voltar. Se você for até lá... não fique depois de escurecer.";
+		treasure_stash_x=3255.9238;
+		treasure_stash_z=1244.896;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo47: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Mamãe e papai não acordaram depois que as pessoas más vieram e machucaram eles. Eu corri até o topo da colina e fiquei lá por muito tempo. Estava com tanta fome. Aí um homem me encontrou. Ele disse que ia cuidar de mim... disse que eu seria um bom aperitivo quando chegássemos ao acampamento dele. Não sei o que isso quer dizer, mas ele me deu comida e eu fiquei feliz. Enterrei as coisas TREASURETYPE da mamãe e do papai na colina, perto de uma rocha grande e dos bancos de madeira velhos onde fazíamos fogueira. Espero que alguém legal encontre.";
+		treasure_stash_x=12313.744;
+		treasure_stash_z=4546.6523;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo48: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Durante anos cuidei de bancos vazios e dos uivos além das paredes da capela. A fé era meu escudo, mas até isso tem limite. Fui mordido semana passada. A febre só piora. Escolhi ir para o ermo e encontrar meu criador em pé, não de joelhos. Enterrei meus pertences TREASURETYPE atrás da velha capela da minha cidadezinha no vale. Que eles te sirvam melhor do que serviram a mim. Vá com Deus.";
+		treasure_stash_x=9585.0049;
+		treasure_stash_z=6818.1851;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo49: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="O cemitério nos serviu bem... por um tempo. Mas acabaram-se os túmulos para revirar e carne fresca ficou escassa. Estamos indo para o sul, onde há mais sobreviventes perambulando – pastos mais verdes, barrigas mais cheias. Antes de partir, enterramos algumas coisas TREASURETYPE que não podíamos carregar debaixo da árvore morta no pátio da igreja. Pegue, se tiver coragem. Só não fique ali depois de escurecer. Podemos voltar com fome...";
+		treasure_stash_x=7905.499;
+		treasure_stash_z=11964.22;
+		mapName="Chernarus";
+	};
+	class ZenTreasure_Photo50: ZenTreasure_PhotoBase
+	{
+		scope=2;
+		descriptionShort="Vivi tempo demais. Tempo demais sem ela. Enterrei meus pertences TREASURETYPE ao lado do túmulo dela, na colina, perto dos bancos de madeira onde costumávamos sentar e descansar quando íamos caminhar antes de tudo isso começar. Agora estou seguindo para o oeste – só eu, o revólver e uma bala. Se você encontrar esta nota e chegar até nossa colina preciosa, lá no extremo nordeste da costa, pegue o que precisar. Mas, por favor... não mexa no túmulo.";
+		treasure_stash_x=11476.594;
+		treasure_stash_z=11320.96;
+		mapName="Chernarus";
+	};
+
+};
+
+  </script>
+
+<script>
+const MAP_FILES = [
+  'mapa_26.png','mapa_27.png','mapa_28.png','mapa_29.png','mapa_30.png',
+  'mapa_31.png','mapa_32.png','mapa_33.png','mapa_34.png','mapa_35.png',
+  'mapa_36.png','mapa_37.png','mapa_38.png','mapa_39.png','mapa_40.png',
+  'mapa_41.png','mapa_42.png','mapa_43.png','mapa_44.png','mapa_45.png',
+  'mapa_46.png','mapa_47.png','mapa_48.png','mapa_49.png','mapa_50.png'
+];
+
+const IMAGE_FILES = ['photo30.png', 'photo31.png', 'photo32.png', 'photo33.png', 'photo34.png', 'photo35.png', 'photo36.png', 'photo37.png', 'photo38.png', 'photo39.png', 'photo40.png', 'photo41.png', 'photo42.png', 'photo43.png', 'photo44.png', 'photo45.png', 'photo46.png', 'photo47.png', 'photo48.png', 'photo49.png', 'photo50.png', 'photo51.png', 'photo52.png', 'photo53.png', 'photo54.png', 'photo55.png', 'photo56.png', 'photo57.png', 'photo58.png', 'photo59.png', 'photo60.png', 'photo_26.png', 'photo00_random.png', 'photo01.png', 'photo01_winter.png', 'photo02.png', 'photo02_winter.png', 'photo03.png', 'photo03_winter.png', 'photo04.png', 'photo04_winter.png', 'photo05.png', 'photo05_winter.png', 'photo06.png', 'photo06_winter.png', 'photo07.png', 'photo07_winter.png', 'photo08.png', 'photo08_winter.png', 'photo09.png', 'photo09_winter.png', 'photo10.png', 'photo10_winter.png', 'photo11.png', 'photo11_winter.png', 'photo12.png', 'photo12_winter.png', 'photo13.png', 'photo13_winter.png', 'photo14.png', 'photo14_winter.png', 'photo15.png', 'photo15_winter.png', 'photo16.png', 'photo16_winter.png', 'photo17.png', 'photo17_winter.png', 'photo18.png', 'photo18_winter.png', 'photo19.png', 'photo19_winter.png', 'photo20.png', 'photo20_winter.png', 'photo21.png', 'photo21_winter.png', 'photo22.png', 'photo22_winter.png', 'photo23.png', 'photo23_winter.png', 'photo24.png', 'photo24_winter.png', 'photo25.png', 'photo25_winter.png', 'photo26.png', 'photo27.png', 'photo28.png', 'photo29.png'];
+
+const els = {
+  filter: document.getElementById("filter"),
+  status: document.getElementById("status"),
+  tbody: document.getElementById("tbody"),
+  ref: document.getElementById("ref"),
+  mapName: document.getElementById("mapName"),
+  xz: document.getElementById("xz"),
+  desc: document.getElementById("desc"),
+  imgSelect: document.getElementById("imgSelect"),
+  preview: document.getElementById("preview"),
+
+  // mapas
+  mapPreview: document.getElementById("mapPreview"),
+  mapFile: document.getElementById("mapFile"),
+};
+
+let entries = [];
+let selectedId = null;
+
+function setStatus(text, kind = "neutral") {
+  els.status.textContent = text;
+  els.status.className = "pill";
+  if (kind === "bad") els.status.classList.add("bad");
+  if (kind === "good") els.status.classList.add("good");
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function defaultImageForId(idNum) {
+  const a = (idNum >= 30) ? `photo${idNum}.png` : `photo${pad2(idNum)}.png`;
+  if (IMAGE_FILES.includes(a)) return a;
+  const b = `photo_${idNum}.png`;
+  if (IMAGE_FILES.includes(b)) return b;
+  return "";
+}
+
+function defaultMapForId(idNum) {
+  const f = `mapa_${idNum}.png`;
+  return MAP_FILES.includes(f) ? f : "";
+}
+
+function resolveImageSrc(filename) {
+  if (!filename) return "";
+  return `images/${filename}`;
+}
+
+function resolveMapSrc(filename) {
+  if (!filename) return "";
+  return `mapas/${filename}`;
+}
+
+function unescapeCfgString(s) {
+  return s
+    .replace(/\\\\/g, "\\")
+    .replace(/\\\"/g, "\"")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\r/g, "\r");
+}
+
+function parseAssignment(block, key) {
+  const idx = block.indexOf(key);
+  if (idx < 0) return null;
+
+  let i = idx + key.length;
+  while (i < block.length && /\s/.test(block[i])) i++;
+  if (block[i] !== "=") return null;
+  i++;
+  while (i < block.length && /\s/.test(block[i])) i++;
+
+  if (block[i] === "\"" ) {
+    i++;
+    let out = "";
+    while (i < block.length) {
+      const ch = block[i];
+      if (ch === "\\" && i + 1 < block.length) { out += ch + block[i + 1]; i += 2; continue; }
+      if (ch === "\"" ) break;
+      out += ch;
+      i++;
+    }
+    return unescapeCfgString(out);
+  }
+
+  let out = "";
+  while (i < block.length && block[i] !== ";") { out += block[i]; i++; }
+  return out.trim();
+}
+
+function extractClassBlocks(text) {
+  const out = [];
+  const re = /class\s+ZenTreasure_Photo(\d+)\s*:\s*ZenTreasure_PhotoBase\s*\{/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const idStr = m[1];
+    const className = `ZenTreasure_Photo${idStr}`;
+    let i = re.lastIndex;
+    let depth = 1;
+
+    while (i < text.length) {
+      const ch = text[i];
+
+      if (ch === "\"" ) {
+        i++;
+        while (i < text.length) {
+          const c2 = text[i];
+          if (c2 === "\\" && i + 1 < text.length) { i += 2; continue; }
+          if (c2 === "\"" ) { i++; break; }
+          i++;
+        }
+        continue;
+      }
+
+      if (ch === "{") depth++;
+      if (ch === "}") depth--;
+      i++;
+      if (depth === 0) break;
+    }
+
+    const block = text.slice(re.lastIndex, i - 1);
+    out.push({ idStr, className, block });
+    re.lastIndex = i;
+  }
+  return out;
+}
+
+function parseConfig(text) {
+  const blocks = extractClassBlocks(text);
+  const parsed = [];
+
+  for (const b of blocks) {
+    const idNum = Number(b.idStr);
+    parsed.push({
+      id: idNum,
+      className: b.className,
+      descriptionShort: parseAssignment(b.block, "descriptionShort") ?? "",
+      x: parseAssignment(b.block, "treasure_stash_x") ?? "",
+      z: parseAssignment(b.block, "treasure_stash_z") ?? "",
+      mapName: parseAssignment(b.block, "mapName") ?? "",
+      imageFile: defaultImageForId(idNum),
+      mapFile: defaultMapForId(idNum),
+    });
+  }
+
+  parsed.sort((a, c) => a.id - c.id);
+  return parsed;
+}
+
+function rebuildImageSelect(current) {
+  els.imgSelect.innerHTML = "";
+  const optEmpty = document.createElement("option");
+  optEmpty.value = "";
+  optEmpty.textContent = "<sem imagem>";
+  els.imgSelect.appendChild(optEmpty);
+
+  for (const f of IMAGE_FILES.slice().sort((a,b)=>a.localeCompare(b))) {
+    const opt = document.createElement("option");
+    opt.value = f;
+    opt.textContent = f;
+    els.imgSelect.appendChild(opt);
+  }
+  els.imgSelect.value = current || "";
+}
+
+function updatePreview(filename) {
+  const src = resolveImageSrc(filename);
+  els.preview.src = src || "";
+  els.preview.title = filename || "";
+}
+
+function updateMapPreview(filename) {
+  const src = resolveMapSrc(filename);
+  els.mapPreview.src = src || "";
+  els.mapPreview.title = filename || "";
+  els.mapFile.value = filename || "";
+}
+
+function selectEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  selectedId = id;
+
+  els.ref.value = e.className;
+  els.mapName.value = e.mapName;
+  els.xz.value = `${e.x}/${e.z}`;
+  els.desc.value = e.descriptionShort;
+
+  rebuildImageSelect(e.imageFile);
+  updatePreview(e.imageFile);
+  updateMapPreview(e.mapFile);
+}
+
+function renderTable() {
+  const q = els.filter.value.trim().toLowerCase();
+  const rows = entries.filter(e => {
+    if (!q) return true;
+    const hay = [
+      String(e.id), e.className, e.mapName, `${e.x}/${e.z}`, e.descriptionShort, e.imageFile, e.mapFile
+    ].join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+
+  els.tbody.innerHTML = "";
+  for (const e of rows) {
+    const tr = document.createElement("tr");
+    tr.dataset.id = String(e.id);
+    tr.innerHTML = `
+      <td class="mono">${e.id}</td>
+      <td class="mono">${e.className}</td>
+      <td class="mono">${(e.x ?? "")}/${(e.z ?? "")}</td>
+      <td class="mono">${e.mapName ?? ""}</td>
+      <td class="mono">${e.imageFile || "<sem imagem>"}</td>
+    `;
+    tr.addEventListener("click", () => selectEntry(e.id));
+    els.tbody.appendChild(tr);
+  }
+
+  setStatus(`OK: ${entries.length} itens (${rows.length} visíveis)`, "good");
+}
+
+function updateSelectedFromForm() {
+  const e = entries.find(x => x.id === selectedId);
+  if (!e) return;
+
+  const raw = (els.xz.value || "").trim();
+  const parts = raw.split("/");
+  if (parts.length === 2) {
+    e.x = parts[0].trim();
+    e.z = parts[1].trim();
+  }
+
+  e.descriptionShort = els.desc.value ?? "";
+  e.imageFile = els.imgSelect.value ?? "";
+
+  // mapa derivado do ID
+  e.mapFile = defaultMapForId(e.id);
+
+  updatePreview(e.imageFile);
+  updateMapPreview(e.mapFile);
+  renderTable();
+}
+
+els.filter.addEventListener("input", renderTable);
+els.xz.addEventListener("input", updateSelectedFromForm);
+els.desc.addEventListener("input", updateSelectedFromForm);
+els.imgSelect.addEventListener("change", updateSelectedFromForm);
+
+(function init() {
+  const text = document.getElementById("configcpp").textContent;
+  entries = parseConfig(text);
+
+  if (!entries.length) {
+    setStatus("Nenhuma classe ZenTreasure_PhotoXX encontrada.", "bad");
+    return;
+  }
+
+  renderTable();
+  selectEntry(entries[0].id);
+})();
+</script>
+
+<script src="https://static.app/js/static.js" type="text/javascript"></script>
+</body>
+</html>
